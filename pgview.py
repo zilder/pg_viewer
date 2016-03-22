@@ -8,7 +8,8 @@ class MainWindow(urwid.Frame):
 	def __init__(self):
 		self.tables_list_walker = urwid.SimpleFocusListWalker([urwid.Text('tables')])
 		self.left = urwid.LineBox(urwid.BoxAdapter(urwid.ListBox(self.tables_list_walker), 22))
-		self.right = urwid.LineBox(urwid.Text('right'))
+		self.right_text = urwid.Text('Select table to view it\'s structure')
+		self.right = urwid.LineBox(self.right_text)
 		self._create_columns()
 
 		header = urwid.Text("Postgres view")
@@ -28,8 +29,21 @@ class MainWindow(urwid.Frame):
 	def set_tables_list(self, tables):
 		result = []
 		for t in tables:
-			result.append(urwid.AttrMap(urwid.Button(t), None, focus_map='selected'))
+			button = urwid.Button(t)
+			urwid.connect_signal(button, 'click', table_button_clicked, self)
+			result.append(urwid.AttrMap(button, None, focus_map='selected'))
+
 		self.tables_list_walker[:] = result 
+
+def table_button_clicked(button, wnd):
+	con = get_connection()
+	cur = con.cursor()
+	cur.execute('select attname, atttypid::regtype from pg_attribute where attnum > 0 and attrelid = %s::regclass', (button.label,))
+
+	result = '%s\n\n' % button.label
+	for r in cur.fetchall():
+		result += '%s   (%s)\n' % (r[0], r[1])
+	wnd.right_text.set_text(result)
 
 def main():
 	con = get_connection()
@@ -50,6 +64,5 @@ def get_connection():
 	return _con;
 	
 if __name__ == '__main__':
-	#wrapper(main)
 	main()
 
